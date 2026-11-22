@@ -1,0 +1,1 @@
+{"name": "Alps Flight", "short_name": "Alps Flight", "start_url": "./index.html", "scope": "./", "display": "fullscreen", "orientation": "any", "background_color": "#8fb4d8", "theme_color": "#0c121a", "icons": [{"src": "icon-192.png", "sizes": "192x192", "type": "image/png"}, {"src": "icon-512.png", "sizes": "512x512", "type": "image/png"}]}

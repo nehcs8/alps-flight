@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Alps Terrain Flight</title>
+<style>
+  :root { --panel: rgba(12, 18, 26, 0.72); --text: #e8eef4; --dim: #9fb0c0; --accent: #ffd36b; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #8fb4d8; color: var(--text);
+               font: 13px/1.45 ui-monospace, "DejaVu Sans Mono", monospace; }
+  canvas#view { display: block; width: 100vw; height: 100vh; }
+  .panel { position: fixed; background: var(--panel); border-radius: 8px; padding: 10px 12px;
+           backdrop-filter: blur(4px); user-select: none; }
+  #hud { top: 12px; left: 12px; min-width: 250px; }
+  #hud b { color: var(--accent); font-weight: 600; }
+  #hud .row { display: flex; justify-content: space-between; gap: 16px; }
+  #hud .k { color: var(--dim); }
+  #places { margin-top: 8px; width: 100%; background: #1d2834; color: var(--text); border: 1px solid #3a4a5a;
+            border-radius: 4px; padding: 3px; font: inherit; }
+  #help { bottom: 12px; left: 12px; right: 360px; color: var(--dim); }
+  #help b { color: var(--text); }
+  #mini { bottom: 12px; right: 12px; padding: 6px; }
+  #mini canvas { display: block; width: 320px; height: auto; cursor: crosshair; border-radius: 4px; }
+  #start { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+           pointer-events: none; }
+  #start div { background: var(--panel); padding: 14px 22px; border-radius: 10px; font-size: 15px; }
+  #cross { position: fixed; left: 50%; top: 50%; width: 10px; height: 10px; margin: -5px 0 0 -5px;
+           border: 1px solid rgba(255,255,255,0.6); border-radius: 50%; pointer-events: none; display: none; }
+  .hidden { display: none !important; }
+  #toast { position: fixed; left: 50%; top: 22%; transform: translateX(-50%); background: var(--panel); color: var(--accent);
+           padding: 8px 16px; border-radius: 8px; font-size: 15px; pointer-events: none; white-space: nowrap; }
+  #labels { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+  .lbl { position: absolute; left: 0; top: 0; white-space: nowrap; display: none; font: 600 12px/1.2 system-ui, sans-serif;
+         color: #fff; text-shadow: 0 0 3px #000, 0 0 2px #000, 0 1px 2px #000; }
+  .lbl small { font-weight: 400; opacity: 0.85; }
+  .lbl.city { font-size: 14px; }
+  .lbl.peak { color: #fff3d6; }
+  .lbl.peak.minor { font-size: 10px; font-weight: 500; opacity: 0.88; }
+  .lbl.lake { color: #bfe3ff; font-style: italic; }
+  .lbl.river { color: #9fd3ff; font-style: italic; font-weight: 500; }
+  .lbl.valley { color: #f1dcb2; font-style: italic; }
+  .lbl.v-major { font-size: 16px; font-weight: 700; letter-spacing: 0.22em; text-transform: uppercase; }
+  .lbl.v-normal { font-size: 12px; font-weight: 600; letter-spacing: 0.1em; }
+  .lbl.v-tiny { font-size: 10px; font-weight: 500; opacity: 0.9; }
+  #attr { font-size: 11px; margin-top: 3px; }
+  #paths { top: 12px; right: 12px; width: 370px; max-height: calc(100vh - 290px); overflow-y: auto; font-size: 12px; }
+  #paths .ph { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 4px; }
+  #paths .ph b { color: var(--accent); }
+  #paths .x { cursor: pointer; padding: 0 4px; font-size: 18px; line-height: 1; }
+  #paths h4 { margin: 10px 0 3px; color: var(--accent); font-size: 12px; font-weight: 600; }
+  #paths h4 .k { font-weight: 400; margin-left: 6px; }
+  #paths .k { color: var(--dim); }
+  #paths label { display: flex; align-items: center; gap: 6px; cursor: pointer; margin: 2px 0; }
+  #paths label.off { opacity: 0.45; cursor: default; }
+  #paths input { margin: 0; accent-color: var(--accent); }
+  #paths .sw { width: 44px; height: 14px; flex: none; border-radius: 2px; }
+  #paths .d { color: var(--dim); font-size: 11px; margin: 0 0 5px 20px; }
+  #paths .grid { display: grid; grid-template-columns: 1fr 1fr 1fr; }
+  #paths .note { margin-top: 10px; padding: 6px 8px; border-left: 3px solid #e01f1a; color: var(--dim); font-size: 11px;
+                 background: rgba(255, 255, 255, 0.04); }
+  #quality { top: 12px; right: 12px; width: 340px; max-height: calc(100vh - 60px); overflow-y: auto; font-size: 12px; z-index: 6; }
+  #quality .ph { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 4px; }
+  #quality .ph b, #quality h4 { color: var(--accent); }
+  #quality h4 { margin: 9px 0 3px; font-size: 12px; font-weight: 600; }
+  #quality .x { cursor: pointer; padding: 0 4px; font-size: 18px; line-height: 1; }
+  #quality .d { color: var(--dim); font-size: 11px; }
+  #quality .qrow { display: flex; flex-wrap: wrap; gap: 4px; }
+  #quality button { background: #1d2834; color: var(--text); border: 1px solid #3a4a5a; border-radius: 5px; padding: 4px 7px;
+                    font: inherit; cursor: pointer; }
+  #quality button.on { background: var(--accent); color: #111; border-color: var(--accent); font-weight: 700; }
+  #quality .qreset { margin-top: 10px; }
+  /* phone build (body.mobile, set by flight.js when window.MOBILE): finger-sized targets (>= 44 px), larger text */
+  body.mobile #help, body.mobile #start, body.mobile #cross { display: none !important; }
+  body.mobile canvas#view { touch-action: none; }
+  body.mobile { -webkit-user-select: none; -webkit-touch-callout: none; }
+  body.mobile #hud { top: calc(6px + env(safe-area-inset-top)); left: calc(6px + env(safe-area-inset-left)); min-width: 0; padding: 6px 8px; font-size: 12px; }
+  body.mobile #places { font-size: 14px; padding: 8px 4px; }
+  body.mobile #mini { top: 6px; bottom: auto; right: 6px; padding: 4px; }
+  body.mobile #mini canvas { width: min(46vw, 300px); }
+  body.mobile #paths, body.mobile #quality { top: 6px; right: 6px; left: 6px; width: auto; max-height: 78vh;
+                                            font-size: 15px; padding: 10px 14px; z-index: 6; }
+  body.mobile #paths .ph, body.mobile #quality .ph { font-size: 17px; align-items: center; }
+  body.mobile #paths .x, body.mobile #quality .x { width: 44px; height: 44px; display: flex; align-items: center;
+               justify-content: center; font-size: 28px; border-radius: 22px; background: rgba(255, 255, 255, 0.10); }
+  body.mobile #paths h4, body.mobile #quality h4 { font-size: 15px; margin: 14px 0 4px; }
+  body.mobile #paths label { min-height: 44px; gap: 10px; margin: 0; }
+  body.mobile #paths input { width: 24px; height: 24px; }
+  body.mobile #paths .d, body.mobile #quality .d { font-size: 13px; margin: 0 0 4px 34px; }
+  body.mobile #quality .d { margin-left: 0; }
+  body.mobile #paths .grid { grid-template-columns: 1fr 1fr; }
+  body.mobile #paths .note { font-size: 13px; }
+  #paths, #quality { touch-action: pan-y; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+  body.mobile #quality button.on { background: #ffd36b; color: #111; border: 2px solid #fff; font-weight: 700; }
+  body.mobile #quality button { min-height: 44px; min-width: 52px; font-size: 15px; padding: 6px 10px; }
+  body.mobile #quality .qrow { gap: 6px; }
+  body.mobile #toast { top: 30%; font-size: 15px; white-space: normal; text-align: center; max-width: 90vw; }
+  #joy { position: fixed; left: calc(22px + env(safe-area-inset-left)); bottom: calc(22px + env(safe-area-inset-bottom)); width: 150px; height: 150px; border-radius: 50%; touch-action: none;
+         background: rgba(12, 18, 26, 0.30); border: 2px solid rgba(255, 255, 255, 0.35); }
+  #knob { position: absolute; left: 50%; top: 50%; width: 62px; height: 62px; margin: -31px 0 0 -31px; border-radius: 50%;
+          background: rgba(255, 255, 255, 0.55); pointer-events: none; }
+  #rail { position: fixed; right: calc(10px + env(safe-area-inset-right)); top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 14px; }
+  .rb { width: 64px; height: 64px; border-radius: 50%; border: 1px solid #3a4a5a; background: rgba(12, 18, 26, 0.66);
+        color: #e8eef4; display: flex; flex-direction: column; align-items: center; justify-content: center; touch-action: none;
+        user-select: none; padding: 0; font-family: system-ui, sans-serif; }
+  .rb b { font-size: 24px; line-height: 1; }
+  .rb small { font-size: 10px; margin-top: 2px; opacity: 0.85; }
+  .rb.on, .rb:active { background: rgba(255, 211, 107, 0.85); color: #111; }
+  .pop { position: fixed; right: 88px; top: 50%; transform: translateY(-50%); background: rgba(12, 18, 26, 0.72);
+         border-radius: 16px; padding: 10px; display: flex; flex-direction: column; align-items: center; gap: 6px;
+         color: #e8eef4; font: 600 14px system-ui, sans-serif; touch-action: none; user-select: none; }
+  .pop .plabel { text-align: center; font-size: 13px; }
+  .pop .plabel small { font-weight: 400; opacity: 0.8; }
+  .vtrack { position: relative; width: 60px; height: 230px; border-radius: 30px; background: rgba(255, 255, 255, 0.14);
+            touch-action: none; }
+  .vtrack::after { content: ''; position: absolute; left: 50%; top: 8%; bottom: 8%; width: 2px; background: rgba(255,255,255,.3); }
+  .vthumb { position: absolute; left: 50%; width: 52px; height: 52px; margin: -26px 0 0 -26px; border-radius: 50%;
+            background: #ffd36b; pointer-events: none; box-shadow: 0 1px 6px rgba(0, 0, 0, 0.5); z-index: 1; }
+  #pop-speed { width: 150px; }
+  #pop-time { width: 250px; }
+  #pop-time .hs { display: flex; flex-direction: column; width: 100%; font-size: 12px; font-weight: 400; opacity: 0.9; }
+  #pop-time input[type=range] { width: 100%; height: 44px; margin: 0; accent-color: #ffd36b; touch-action: none; }
+  #pop-time input[type=range]::-webkit-slider-thumb { width: 34px; height: 34px; }
+  #pop-time #tnow { width: 100%; min-height: 46px; border-radius: 12px; border: 1px solid #3a4a5a; background: #1d2834;
+                    color: #e8eef4; font: 600 15px system-ui, sans-serif; }
+  #pop-settings .credits { width: 210px; font: 400 10px/1.35 system-ui, sans-serif; opacity: 0.7; margin-top: 4px; }
+  #pop-settings button { width: 210px; min-height: 50px; border-radius: 12px; border: 1px solid #3a4a5a; background: #1d2834;
+                         color: #e8eef4; font: 600 15px system-ui, sans-serif; text-align: left; padding: 0 14px; }
+  @media (orientation: landscape) and (max-height: 500px) {      /* phone on its side: tighter rail, shorter sliders */
+    #rail { gap: 6px; }
+    .rb { width: 54px; height: 54px; }
+    .rb b { font-size: 20px; }
+    .vtrack { height: 170px; }
+    .pop { right: 76px; }
+    body.mobile #paths, body.mobile #quality { max-height: 88vh; }
+    body.mobile #mini canvas { width: min(32vw, 250px); }
+    body.mobile #hud { font-size: 11px; }
+  }
+</style>
+<script>window.MOBILE = 1; window.WEB = 1;
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});</script>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Alps Flight">
+<meta name="theme-color" content="#0c121a">
+<script type="importmap">
+  { "imports": { "three": "./lib/three.module.js",
+                 "three/addons/": "./lib/addons/" } }
+</script>
+</head>
+<body>
+<canvas id="view"></canvas>
+<div id="labels"></div>
+<div id="cross"></div>
+<div id="hud" class="panel">
+  <div class="row"><span class="k">position</span><span id="h-pos">–</span></div>
+  <div class="row"><span class="k">altitude</span><span id="h-alt">–</span></div>
+  <div class="row"><span class="k">above ground</span><span id="h-agl">–</span></div>
+  <div class="row"><span class="k">ground</span><span id="h-gnd">–</span></div>
+  <div class="row"><span class="k">heading</span><span id="h-hdg">–</span></div>
+  <div class="row"><span class="k">speed now</span><span id="h-spd">–</span></div>
+  <div class="row"><span class="k">speed setting (− =)</span><span id="h-set">–</span></div>
+  <div class="row"><span class="k">mode</span><b id="h-mode">fly</b></div>
+  <div class="row"><span class="k">map (T)</span><span id="h-style">satellite</span></div>
+  <div class="row"><span class="k">chunks drawn / cached</span><span id="h-lod">–</span></div>
+  <div class="row"><span class="k">fps</span><span id="h-fps">–</span></div>
+  <div class="row"><span class="k">time (CET/CEST)</span><span id="h-time">–</span></div>
+  <div class="row"><span class="k">sun</span><span id="h-sunpos">–</span></div>
+  <div class="row"><span class="k">sun here</span><span id="h-sun">O = overlay</span></div>
+  <div id="legend" class="hidden">
+    <div id="lg-title" class="k" style="margin-top:6px"></div>
+    <div id="lg-bar" style="height:10px;border-radius:3px;margin:3px 0"></div>
+    <div class="row"><span id="lg-lo"></span><span id="lg-hi"></span></div>
+  </div>
+  <select id="places"><option value="">— teleport to … —</option></select>
+</div>
+<div id="help" class="panel">
+  <b>click</b> to fly · <b>mouse / arrows</b> look · <b>W A S D</b> move · <b>Space</b> up · <b>. / C</b> down · <b>V</b> level ↔ free flight ·
+  <b>− =</b> speed steps · <b>Shift</b> ×20 (walk ×5)<br>
+  <b>G</b> walk / fly · <b>[ ]</b> time ∓1 h · <b>9 0</b> date ∓1 day (Shift ∓30) · <b>K</b> now · <b>F</b> haze · <b>L</b> detail · <b>X</b> quality · <b>O</b> sun overlay ·
+  <b>T</b> map: satellite → painted → plain · <b>B</b> 3-D towns · <b>P</b> paths &amp; roads menu (Shift+P on/off) · <b>N</b> names · <b>M</b> map · <b>H</b> hide panels · <b>Esc</b> release mouse (then click map to teleport)
+  <div id="attr">Terrain: Copernicus GLO-30 · Imagery: Sentinel-2 cloudless 2022 by EOX (s2maps.eu, CC BY-NC-SA 4.0;
+  modified Copernicus Sentinel data) · Names, paths, roads © OpenStreetMap contributors ·
+  Official trails: swisstopo swissTLM3D, Euregio digiway · Towns (phone): GHSL © European Union, CC BY 4.0</div>
+</div>
+<div id="paths" class="panel hidden"></div>
+<div id="quality" class="panel hidden"></div>
+<div id="mini" class="panel"><canvas id="minimap"></canvas></div>
+<div id="toast" class="hidden"></div>
+<div id="start"><div>Click to start · Esc to release the mouse</div></div>
+<script type="module" src="flight.js"></script>
+</body>
+</html>
