@@ -497,7 +497,11 @@ void main() {
   // there is no mask (far chunks, satellite glint, water.json missing): GLO-30 is also flat on wetlands and plains
   if (paint && featOn > 0.5) riv = texture2D(featTex, vFeatUV).r;
   bool masked = featOn > 0.5 && !sat && waterMask > 0.5 && featValid > 0.5;   // outside the OSM extract: flat test
+#ifdef LITE
+  bool water = vSea > 0.5 || (riv > 0.7 && !sat);               // phone: sea + OSM water only (1-m heights: plains
+#else                                                           // look exactly flat, so no flatness guess)
   bool water = vSea > 0.5 || (vFlat > 0.5 && !masked) || (riv > 0.7 && !sat);
+#endif
   float land = 0.0;
   if (sunMode > 0.5) {                     // sun-hours / sunless-days overlay (scripts/sun_alps.py)
     vec4 sv = texture2D(sunTex, vSunUV);
@@ -933,6 +937,7 @@ function buildFeat(ch) {
       for (const a of FEAT.wat.get(r * 100000 + c) || []) {
         if (seenW.has(a)) continue; seenW.add(a);
         if (a.la1 < lat0 || a.la0 > lat1 || a.lo1 < lon0 || a.lo0 > lon1) continue;
+        if ((a.la1 - a.la0) * DEG < 0.5 * mpx && (a.lo1 - a.lo0) * KX < 0.5 * mpx) continue;   // under half a pixel here
         g.beginPath();
         for (const ring of a.rings) {
           g.moveTo(X(ring[1]), Y(ring[0]));
@@ -981,7 +986,7 @@ function updateFeat() {
   if (shared.style.value === 1 || !FEAT) return;                 // plain uses the rivers, painted everything
   const P = camera.position, todo = [];
   for (const ch of drawn) {
-    if (ch.feat || ch.L > 3) continue;
+    if (ch.feat || ch.L > (MOBILE ? NL - 1 : 3)) continue;        // phone: every level (its only water source)
     todo.push([ch.box.distanceToPoint(P) / ch.size, ch]);
   }
   todo.sort((a, b) => a[0] - b[0]);

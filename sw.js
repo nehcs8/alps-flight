@@ -1,6 +1,6 @@
 // Alps Flight offline cache (build_mobile.py web). App shell: network first (updates), cached copy offline.
 // Terrain / path tiles: cache first, stored the first time they are seen.
-const V = '202611221749', SHELL = ["./", "index.html", "flight.js", "manifest.webmanifest", "icon-192.png", "tiles/meta.json", "tiles/overview.png", "labels.json", "water.json", "features.json", "trails/tunnels/tunnels.json", "lib/three.module.js", "lib/addons/lines/LineSegments2.js", "lib/addons/lines/LineSegmentsGeometry.js", "lib/addons/lines/LineMaterial.js", "trails/osm/index.json", "trails/roads/index.json", "trails/ch/index.json"];
+const V = '202611231139', SHELL = ["./", "index.html", "flight.js", "manifest.webmanifest", "icon-192.png", "tiles/meta.json", "tiles/overview.png", "labels.json", "water.json", "features.json", "trails/tunnels/tunnels.json", "lib/three.module.js", "lib/addons/lines/LineSegments2.js", "lib/addons/lines/LineSegmentsGeometry.js", "lib/addons/lines/LineMaterial.js", "trails/osm/index.json", "trails/roads/index.json", "trails/ch/index.json"];
 self.addEventListener('install', e => e.waitUntil(caches.open('shell-' + V).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())));
 self.addEventListener('activate', e => e.waitUntil(caches.keys().then(ks => Promise.all(
   ks.filter(k => k.startsWith('shell-') && k !== 'shell-' + V).map(k => caches.delete(k)))).then(() => self.clients.claim())));
